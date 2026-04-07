@@ -1,44 +1,40 @@
-from openai import OpenAI
+import os
 from telegram import Update
 from telegram.ext import ApplicationBuilder, MessageHandler, filters, ContextTypes
-import os
+import requests
 
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
+TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 
-# 👉 DÁN API OPENAI VÀO ĐÂY
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-
-# 👉 DÁN TOKEN TELEGRAM VÀO ĐÂY
-TELEGRAM_TOKEN = "8759661408:AAFJwGyM53TBFBQudemcmRFrhm6D7YHyLBM"
-
-# Hàm xử lý tin nhắn
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_message = update.message.text
-    print("User:", user_message)
 
     try:
-        response = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[
-                {"role": "user", "content": user_message}
-            ]
+        response = requests.post(
+            url="https://openrouter.ai/api/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+                "Content-Type": "application/json"
+            },
+            json={
+                "model": "mistralai/mistral-7b-instruct",
+                "messages": [
+                    {"role": "user", "content": user_message}
+                ]
+            }
         )
 
-        reply = response.choices[0].message.content
-        print("Bot:", reply)
-
-        await update.message.reply_text(reply)
+        data = response.json()
+        reply = data["choices"][0]["message"]["content"]
 
     except Exception as e:
-        print("ERROR:", e)
-        await update.message.reply_text("Không nạp tiền mà đòi hỏi, lắm chuyện 😕")
+        reply = "Bot đang lỗi 😢"
 
-# Khởi tạo bot
+    await update.message.reply_text(reply)
+
+
 app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
+app.add_handler(MessageHandler(filters.TEXT, handle_message))
 
-# Nhận mọi tin nhắn text
-app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-
-print("Bot đang chạy...")
-
-# Chạy bot
+print("Bot đang chạy FREE...")
 app.run_polling()
